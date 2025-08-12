@@ -12,7 +12,14 @@ type GameState = {
 
   totalDistricts: number;
   cellsPerDistrict: number;
-  currentDistrict: number; // 0 = Eraser (unassign), 1..N = real districts
+
+  // Level target & rules
+  targetSeats: { R: number; B: number };
+  requireAllAssigned: boolean;
+  requireExactSizes: boolean;
+  requireContiguity: boolean;
+
+  currentDistrict: number; // 0 = Eraser, 1..N = real districts
 
   // painting state
   isPainting: boolean;
@@ -42,31 +49,21 @@ function neighbors4(index: number, rows: number, cols: number): number[] {
 
 function isAdditionSafe(grid: Cell[], rows: number, cols: number, d: number, addIndex: number): boolean {
   let hasAny = false;
-  for (let i = 0; i < grid.length; i++) {
-    if (grid[i].districtId === d) {
-      hasAny = true;
-      break;
-    }
-  }
+  for (let i = 0; i < grid.length; i++) if (grid[i].districtId === d) { hasAny = true; break; }
   if (!hasAny) return true; // first cell is always fine
-  for (const nb of neighbors4(addIndex, rows, cols)) {
-    if (grid[nb] && grid[nb].districtId === d) return true;
-  }
+  for (const nb of neighbors4(addIndex, rows, cols)) if (grid[nb] && grid[nb].districtId === d) return true;
   return false;
 }
 
 function isRemovalSafe(grid: Cell[], rows: number, cols: number, d: number, removeIndex: number): boolean {
   const remaining: number[] = [];
-  for (let i = 0; i < grid.length; i++) {
-    if (i !== removeIndex && grid[i].districtId === d) remaining.push(i);
-  }
+  for (let i = 0; i < grid.length; i++) if (i !== removeIndex && grid[i].districtId === d) remaining.push(i);
   if (remaining.length === 0) return true; // removing last cell is fine
 
   const allowed = new Set(remaining);
   const start = remaining[0];
   const visited = new Set<number>([start]);
   const q: number[] = [start];
-
   while (q.length) {
     const cur = q.shift()!;
     for (const nb of neighbors4(cur, rows, cols)) {
@@ -87,7 +84,13 @@ export const useGame = create<GameState>()(
     grid: generateGrid({ rows: 20, cols: 20, seed: 12345, redRatio: 0.5 }),
 
     totalDistricts: 5,
-    cellsPerDistrict: 80, // 400 / 5
+    cellsPerDistrict: 80,              // 400 / 5
+
+    // Level target & checks (you can tweak these later per level)
+    targetSeats: { R: 2, B: 3 },       // exact 3–2 for Blue
+    requireAllAssigned: true,
+    requireExactSizes: true,
+    requireContiguity: true,
 
     currentDistrict: 1,
 
@@ -96,7 +99,6 @@ export const useGame = create<GameState>()(
 
     setCurrentDistrict: (d) =>
       set((st) => {
-        // allow 0 (Eraser) through totalDistricts
         if (d < 0) d = 0;
         if (d > st.totalDistricts) d = st.totalDistricts;
         st.currentDistrict = d;
@@ -115,35 +117,32 @@ export const useGame = create<GameState>()(
         const cell = st.grid[index];
         if (!cell) return;
 
-        // --- ERASE: set to unassigned if it won't split the source district ---
+        // ERASE (unassign) if it won't split source
         if (d === 0) {
           const source = cell.districtId;
           if (!source) return; // already unassigned
-          if (!isRemovalSafe(st.grid, rows, cols, source, index)) return; // would split
+          if (!isRemovalSafe(st.grid, rows, cols, source, index)) return;
           cell.districtId = undefined;
           return;
         }
 
-        // --- PAINT to district d (>=1) ---
+        // Paint to district d
+        if (cell.districtId === d) return; // no-op
 
-        // no-op if already in target
-        if (cell.districtId === d) return;
-
-        // enforce target size cap
+        // size cap
         let targetSize = 0;
         for (const c of st.grid) if (c.districtId === d) targetSize++;
         if (targetSize >= cellsPerDistrict) return;
 
-        // addition must touch the district (no new islands)
+        // addition must touch district
         if (!isAdditionSafe(st.grid, rows, cols, d, index)) return;
 
-        // moving from a different source district? ensure removal won't split source
+        // moving from another district must not split source
         const source = cell.districtId;
         if (source && source !== d) {
           if (!isRemovalSafe(st.grid, rows, cols, source, index)) return;
         }
 
-        // apply
         cell.districtId = d;
       }),
 

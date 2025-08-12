@@ -3,26 +3,24 @@ import Board from './canvas/Board';
 import { useGame } from './store/useGame';
 import { useMemo } from 'react';
 import HUD from './ui/HUD';
+import WinBanner from './ui/WinBanner';
 
 function DistrictPicker() {
   const { grid, totalDistricts, cellsPerDistrict, currentDistrict, setCurrentDistrict } = useGame();
 
-  // sizes per district + unassigned count
   const { sizes, unassigned } = useMemo(() => {
-    const sizes = Array(totalDistricts + 1).fill(0); // 1..N used
+    const sizes = Array(totalDistricts + 1).fill(0);
     let unassigned = 0;
     for (const cell of grid) {
       if (!cell.districtId) unassigned++;
-      else if (cell.districtId >= 1 && cell.districtId <= totalDistricts) {
-        sizes[cell.districtId]++;
-      }
+      else if (cell.districtId >= 1 && cell.districtId <= totalDistricts) sizes[cell.districtId]++;
     }
     return { sizes, unassigned };
   }, [grid, totalDistricts]);
 
   const buttons = [];
 
-  // Eraser button (district 0)
+  // Eraser button (0)
   buttons.push(
     <button
       key="eraser"
@@ -41,7 +39,6 @@ function DistrictPicker() {
     </button>
   );
 
-  // District buttons 1..N
   for (let d = 1; d <= totalDistricts; d++) {
     const isActive = d === currentDistrict;
     buttons.push(
@@ -62,6 +59,7 @@ function DistrictPicker() {
       </button>
     );
   }
+
   return <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap' }}>{buttons}</div>;
 }
 
@@ -73,8 +71,7 @@ function SelectedDistrictStats() {
       const unassigned = grid.reduce((acc, c) => acc + (c.districtId ? 0 : 1), 0);
       return { label: 'Eraser', size: unassigned, r: 0, b: 0 };
     }
-    let size = 0,
-      r = 0;
+    let size = 0, r = 0;
     for (const cell of grid) {
       if (cell.districtId === currentDistrict) {
         size++;
@@ -115,6 +112,8 @@ export default function App() {
       <SelectedDistrictStats />
 
       <Board />
+
+      <WinBanner />
 
       <HUD />
     </div>
