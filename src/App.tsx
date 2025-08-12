@@ -2,6 +2,7 @@ import './App.css';
 import Board from './canvas/Board';
 import { useGame } from './store/useGame';
 import { useMemo } from 'react';
+import HUD from './ui/HUD';
 
 function DistrictPicker() {
   const { grid, totalDistricts, cellsPerDistrict, currentDistrict, setCurrentDistrict } = useGame();
@@ -41,11 +42,11 @@ function DistrictPicker() {
 }
 
 function SelectedDistrictStats() {
-  const { grid, totalDistricts, currentDistrict, cellsPerDistrict } = useGame();
+  const { grid, currentDistrict, cellsPerDistrict } = useGame();
 
-  // compute R/B in the selected district
   const { size, r, b } = useMemo(() => {
-    let size = 0, r = 0;
+    let size = 0,
+      r = 0;
     for (const cell of grid) {
       if (cell.districtId === currentDistrict) {
         size++;
@@ -78,6 +79,8 @@ export default function App() {
       <SelectedDistrictStats />
 
       <Board />
+
+      <HUD />
     </div>
   );
 }
