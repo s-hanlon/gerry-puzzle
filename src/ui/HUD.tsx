@@ -6,6 +6,7 @@ import { computeContiguity } from '../game/contiguity';
 export default function HUD() {
   const { grid, totalDistricts, cellsPerDistrict, rows, cols } = useGame();
 
+  // Existing board/district stats
   const stats = useMemo(
     () => computeStats(grid, totalDistricts, cellsPerDistrict),
     [grid, totalDistricts, cellsPerDistrict]
@@ -14,6 +15,20 @@ export default function HUD() {
     () => computeContiguity(grid, totalDistricts, rows, cols),
     [grid, totalDistricts, rows, cols]
   );
+
+  // NEW: global composition + unassigned pool composition
+  const { totalR, totalB, unassignedR, unassignedB } = useMemo(() => {
+    let totalR = 0, unassignedR = 0;
+    for (const cell of grid) {
+      if (cell.color === 'R') {
+        totalR++;
+        if (!cell.districtId) unassignedR++;
+      }
+    }
+    const totalB = grid.length - totalR;
+    const unassignedB = stats.unassigned - unassignedR;
+    return { totalR, totalB, unassignedR, unassignedB };
+  }, [grid, stats.unassigned]);
 
   const contigById = useMemo(() => {
     const m = new Map<number, { components: number; contiguous: boolean; size: number }>();
@@ -32,6 +47,15 @@ export default function HUD() {
         fontFamily: 'Inter, system-ui, Arial',
       }}
     >
+      {/* NEW: Global composition row */}
+      <div style={{ display: 'flex', flexWrap: 'wrap', gap: 16, marginBottom: 8 }}>
+        <strong>Board composition:</strong>
+        <span>R {totalR} · B {totalB}</span>
+        <strong>Unassigned pool:</strong>
+        <span>R {unassignedR} · B {unassignedB}</span>
+      </div>
+
+      {/* Existing topline */}
       <div style={{ display: 'flex', flexWrap: 'wrap', gap: 16, marginBottom: 8 }}>
         <strong>Unassigned:</strong>
         <span>
