@@ -1,9 +1,21 @@
 import './App.css';
 import Board from './canvas/Board';
 import { useGame } from './store/useGame';
+import { useMemo } from 'react';
 
 function DistrictPicker() {
-  const { totalDistricts, currentDistrict, setCurrentDistrict } = useGame();
+  const { grid, totalDistricts, cellsPerDistrict, currentDistrict, setCurrentDistrict } = useGame();
+
+  const sizes = useMemo(() => {
+    const arr = Array(totalDistricts + 1).fill(0);
+    for (const cell of grid) {
+      if (cell.districtId && cell.districtId >= 1 && cell.districtId <= totalDistricts) {
+        arr[cell.districtId]++;
+      }
+    }
+    return arr; // index by districtId
+  }, [grid, totalDistricts]);
+
   const buttons = [];
   for (let d = 1; d <= totalDistricts; d++) {
     const isActive = d === currentDistrict;
@@ -21,11 +33,34 @@ function DistrictPicker() {
         }}
         title={`Set current district to ${d}`}
       >
-        {d}
+        D{d} ({sizes[d]}/{cellsPerDistrict})
       </button>
     );
   }
   return <div style={{ display: 'flex', gap: 8 }}>{buttons}</div>;
+}
+
+function SelectedDistrictStats() {
+  const { grid, totalDistricts, currentDistrict, cellsPerDistrict } = useGame();
+
+  // compute R/B in the selected district
+  const { size, r, b } = useMemo(() => {
+    let size = 0, r = 0;
+    for (const cell of grid) {
+      if (cell.districtId === currentDistrict) {
+        size++;
+        if (cell.color === 'R') r++;
+      }
+    }
+    const b = size - r;
+    return { size, r, b };
+  }, [grid, currentDistrict]);
+
+  return (
+    <div style={{ fontSize: 14, opacity: 0.9 }}>
+      <strong>District D{currentDistrict}:</strong> {size}/{cellsPerDistrict} · R {r} / B {b}
+    </div>
+  );
 }
 
 export default function App() {
@@ -36,10 +71,11 @@ export default function App() {
         Click and drag to paint cells into the selected district.
       </p>
 
-      <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 12 }}>
+      <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 4 }}>
         <span style={{ fontWeight: 600 }}>Current district:</span>
         <DistrictPicker />
       </div>
+      <SelectedDistrictStats />
 
       <Board />
     </div>

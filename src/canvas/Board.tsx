@@ -9,7 +9,7 @@ import {
 } from 'pixi.js';
 import { useGame } from '../store/useGame';
 
-// register Pixi classes for JSX elements: <pixiContainer>, <pixiGraphics>
+// Register Pixi classes for JSX elements: <pixiContainer>, <pixiGraphics>
 extend({ Container, Graphics });
 
 const DISTRICT_COLORS: number[] = [
@@ -37,7 +37,7 @@ export default function Board() {
   const height = rows * cellSize;
   const parentRef = useRef<HTMLDivElement>(null);
 
-  // base voter cell
+  // Base voter cell (solid red/blue)
   const drawCell = useCallback(
     (g: PixiGraphics, x: number, y: number, color: 'R' | 'B') => {
       g.clear();
@@ -47,15 +47,17 @@ export default function Board() {
     [cellSize]
   );
 
-  // overlay for district assignment (semi-transparent)
+  // Semi-transparent district overlay (lets voter color show through)
   const drawDistrictOverlay = useCallback(
     (g: PixiGraphics, x: number, y: number, districtId?: number) => {
       g.clear();
       if (!districtId) return;
       const color = DISTRICT_COLORS[(districtId - 1) % DISTRICT_COLORS.length] ?? 0x000000;
-      g.alpha = 0.35;
-      g.rect(x, y, cellSize - 1, cellSize - 1).fill(color);
-      g.alpha = 1;
+
+      // Use Pixi v8 fill options with alpha for transparency (do NOT use g.alpha here)
+      g.rect(x, y, cellSize - 1, cellSize - 1)
+        .fill({ color, alpha: 0.22 })
+        .stroke({ color, alpha: 0.6, width: 1 }); // thin outline helps readability
     },
     [cellSize]
   );
@@ -90,7 +92,7 @@ export default function Board() {
     [grid, cellSize, drawDistrictOverlay]
   );
 
-  // canvas pixel -> cell index
+  // Canvas pixel -> cell index
   const getIndexFromPointer = useCallback(
     (e: FederatedPointerEvent) => {
       const c = Math.floor(e.global.x / cellSize);
@@ -138,7 +140,9 @@ export default function Board() {
             onPointerUp={onPointerUp}
             onPointerUpOutside={onPointerUp}
           >
+            {/* Layer 1: base voter colors */}
             <pixiContainer>{cellsVoter}</pixiContainer>
+            {/* Layer 2: transparent district overlay */}
             <pixiContainer>{cellsOverlay}</pixiContainer>
           </pixiContainer>
         </Application>

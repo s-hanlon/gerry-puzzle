@@ -11,6 +11,7 @@ type GameState = {
   grid: Cell[];
 
   totalDistricts: number;
+  cellsPerDistrict: number;   // NEW
   currentDistrict: number;
 
   // painting state
@@ -35,6 +36,9 @@ export const useGame = create<GameState>()(
     grid: generateGrid({ rows: 20, cols: 20, seed: 12345, redRatio: 0.5 }),
 
     totalDistricts: 5,
+    // 20*20 = 400, 400 / 5 = 80 cells per district
+    cellsPerDistrict: 80,      // NEW
+
     currentDistrict: 1,
 
     isPainting: false,
@@ -56,7 +60,12 @@ export const useGame = create<GameState>()(
         const d = st.paintDistrict ?? st.currentDistrict;
         const cell = st.grid[index];
         if (!cell) return;
-        if (cell.districtId === d) return; // no-op if already set
+        if (cell.districtId === d) return; // already assigned to this district
+
+        // size cap: block if target district is already full
+        const size = st.grid.reduce((acc, c) => acc + (c.districtId === d ? 1 : 0), 0);
+        if (size >= st.cellsPerDistrict) return;
+
         cell.districtId = d;
       }),
 
