@@ -6,6 +6,24 @@ import HUD from './ui/HUD';
 import WinBanner from './ui/WinBanner';
 import LevelPicker from './ui/LevelPicker';
 
+function ModeTabs() {
+  const { mode, setMode } = useGame();
+  const tabStyle = (active: boolean) => ({
+    padding: '8px 12px',
+    borderRadius: 8,
+    border: active ? '2px solid #111' : '1px solid #ccc',
+    background: active ? '#fff' : '#f7f7f7',
+    fontWeight: active ? 700 : 500,
+    cursor: 'pointer',
+  });
+  return (
+    <div style={{ display: 'flex', gap: 8, marginBottom: 10 }}>
+      <button style={tabStyle(mode === 'freeplay')} onClick={() => setMode('freeplay')}>Freeplay</button>
+      <button style={tabStyle(mode === 'level')} onClick={() => setMode('level')}>Levels</button>
+    </div>
+  );
+}
+
 function FreeplayControls() {
   const { mode, difficulty, setDifficulty, regenerate } = useGame();
 
@@ -128,16 +146,24 @@ function SelectedDistrictStats() {
 }
 
 export default function App() {
+  const { mode } = useGame();
+
   return (
     <div style={{ padding: 16, fontFamily: 'Inter, system-ui, Arial' }}>
       <h1 style={{ marginBottom: 12 }}>Gerry Puzzle (MVP)</h1>
 
-      {/* Freeplay controls + Level picker */}
+      {/* NEW: Mode tabs */}
+      <ModeTabs />
+
+      {/* Freeplay controls (disabled in Level mode) */}
       <FreeplayControls />
-      <LevelPicker />
+
+      {/* Level picker only when in Levels */}
+      {mode === 'level' && <LevelPicker />}
 
       <p style={{ marginTop: 0, marginBottom: 12, opacity: 0.8 }}>
-        Click and drag to paint cells. Use <strong>Eraser</strong> to unassign (won’t allow splits).
+        Click and drag to paint cells. Use <strong>Eraser</strong> to unassign
+        {mode === 'level' ? ' (level rules apply).' : ' (won’t allow splits).'}
       </p>
 
       <div style={{ display: 'flex', alignItems: 'center', gap: 12, marginBottom: 4, flexWrap: 'wrap' }}>

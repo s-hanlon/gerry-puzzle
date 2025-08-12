@@ -2,7 +2,7 @@ import { LEVELS } from '../game/levels';
 import { useGame } from '../store/useGame';
 
 export default function LevelPicker() {
-  const { loadLevel, mode, currentLevelIndex } = useGame();
+  const { loadLevel, mode, currentLevelIndex, setMode } = useGame();
 
   return (
     <div
@@ -14,7 +14,17 @@ export default function LevelPicker() {
         background: '#fbfbfb',
       }}
     >
-      <div style={{ fontWeight: 700, marginBottom: 8 }}>Levels — World 1</div>
+      <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
+        <div style={{ fontWeight: 700 }}>Levels — World 1</div>
+        <button
+          onClick={() => setMode('freeplay')}
+          style={{ padding: '6px 10px', borderRadius: 6, border: '1px solid #ccc', background: '#fff', cursor: 'pointer' }}
+          title="Switch to Freeplay"
+        >
+          Back to Freeplay
+        </button>
+      </div>
+
       <div style={{ display: 'grid', gap: 8 }}>
         {LEVELS.map((lvl, i) => {
           const isActive = mode === 'level' && currentLevelIndex === i;

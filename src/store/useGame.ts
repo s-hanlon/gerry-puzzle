@@ -7,7 +7,6 @@ import type { LevelDef } from '../game/levels';
 type Difficulty = 'easy' | 'medium' | 'hard';
 
 function redRatioFor(d: Difficulty): number {
-  // redRatio = P(cell is Red). Easy favors Blue (more blue cells overall).
   if (d === 'easy') return 0.40; // ~60% Blue
   if (d === 'hard') return 0.60; // ~60% Red
   return 0.50; // balanced
@@ -45,6 +44,7 @@ type GameState = {
   currentLevelIndex: number | null;
 
   // Actions
+  setMode: (mode: 'freeplay' | 'level') => void;
   setCurrentDistrict: (d: number) => void;
   setDifficulty: (d: Difficulty) => void;
   loadLevel: (level: LevelDef, index: number) => void;
@@ -132,6 +132,40 @@ export const useGame = create<GameState>()(
     paintDistrict: null,
 
     currentLevelIndex: null,
+
+    // NEW: Simple mode switcher (tabs use this)
+    setMode: (mode) =>
+      set((st) => {
+        if (mode === 'freeplay') {
+          st.mode = 'freeplay';
+          st.currentLevelIndex = null;
+
+          // Reset to your Freeplay defaults
+          st.rows = 20;
+          st.cols = 20;
+          st.totalDistricts = 5;
+          st.cellsPerDistrict = (st.rows * st.cols) / st.totalDistricts;
+
+          st.targetSeats = { R: 2, B: 3 };
+          st.requireAllAssigned = true;
+          st.requireExactSizes = true;
+          st.requireContiguity = true;
+
+          // Use current difficulty to set composition
+          st.redRatio = redRatioFor(st.difficulty);
+          const s = Math.floor(Math.random() * 1_000_000);
+          st.seed = s;
+          st.grid = generateGrid({ rows: st.rows, cols: st.cols, seed: s, redRatio: st.redRatio });
+
+          // reset tool
+          st.currentDistrict = 1;
+          st.isPainting = false;
+          st.paintDistrict = null;
+        } else {
+          // Switch UI into "Levels" area (actual level loads when user picks one)
+          st.mode = 'level';
+        }
+      }),
 
     setCurrentDistrict: (d) =>
       set((st) => {
