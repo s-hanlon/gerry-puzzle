@@ -4,9 +4,10 @@ import { useGame } from './store/useGame';
 import { useMemo } from 'react';
 import HUD from './ui/HUD';
 import WinBanner from './ui/WinBanner';
+import LevelPicker from './ui/LevelPicker';
 
 function FreeplayControls() {
-  const { difficulty, setDifficulty, regenerate } = useGame();
+  const { mode, difficulty, setDifficulty, regenerate } = useGame();
 
   return (
     <div style={{ display: 'flex', gap: 12, alignItems: 'center', marginBottom: 8, flexWrap: 'wrap' }}>
@@ -15,6 +16,7 @@ function FreeplayControls() {
         <select
           value={difficulty}
           onChange={(e) => setDifficulty(e.target.value as any)}
+          disabled={mode === 'level'}
           style={{ padding: '4px 6px', borderRadius: 6 }}
         >
           <option value="easy">Easy (more Blue)</option>
@@ -24,7 +26,9 @@ function FreeplayControls() {
       </label>
       <button
         onClick={() => regenerate()}
+        disabled={mode === 'level'}
         style={{ padding: '6px 10px', borderRadius: 6, border: '1px solid #ccc', background: '#fff', cursor: 'pointer' }}
+        title={mode === 'level' ? 'Regenerate disabled in Level mode' : 'Generate a new freeplay map'}
       >
         New Map
       </button>
@@ -128,8 +132,9 @@ export default function App() {
     <div style={{ padding: 16, fontFamily: 'Inter, system-ui, Arial' }}>
       <h1 style={{ marginBottom: 12 }}>Gerry Puzzle (MVP)</h1>
 
-      {/* Freeplay difficulty + regenerate */}
+      {/* Freeplay controls + Level picker */}
       <FreeplayControls />
+      <LevelPicker />
 
       <p style={{ marginTop: 0, marginBottom: 12, opacity: 0.8 }}>
         Click and drag to paint cells. Use <strong>Eraser</strong> to unassign (won’t allow splits).
@@ -143,7 +148,6 @@ export default function App() {
 
       <Board />
 
-      {/* Win banner + HUD */}
       <WinBanner />
       <HUD />
     </div>

@@ -56,7 +56,7 @@ export default function Board() {
 
       // Use Pixi v8 fill options with alpha for transparency (do NOT use g.alpha here)
       g.rect(x, y, cellSize - 1, cellSize - 1)
-        .fill({ color, alpha: 0.22 })
+        .fill({ color, alpha: 0.75 })
         .stroke({ color, alpha: 0.6, width: 1 }); // thin outline helps readability
     },
     [cellSize]

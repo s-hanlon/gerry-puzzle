@@ -28,19 +28,23 @@ export function evaluateWin(
   const contiguityAllOk = contig.every((c) => c.size === 0 || c.contiguous);
   const seatsR = stats.totalRSeats;
   const seatsB = stats.totalBSeats;
-  const meetsSeatTarget = seatsR === targetSeats.R && seatsB === targetSeats.B;
+  const seatTargetEnabled = (targetSeats.R + targetSeats.B) > 0;
+  const meetsSeatTarget = !seatTargetEnabled
+    || (seatsR === targetSeats.R && seatsB === targetSeats.B);
 
   const unmetReasons: string[] = [];
   if (opts.requireAllAssigned && !stats.allAssigned) unmetReasons.push('Assign all cells');
   if (opts.requireExactSizes && !stats.sizeAllOk) unmetReasons.push('Each district must be exact size');
   if (opts.requireContiguity && !contiguityAllOk) unmetReasons.push('All districts must be contiguous');
-  if (!meetsSeatTarget) unmetReasons.push(`Seats must be R ${targetSeats.R} · B ${targetSeats.B}`);
+  if (seatTargetEnabled && !meetsSeatTarget)
+    unmetReasons.push(`Seats must be R ${targetSeats.R} · B ${targetSeats.B}`);
 
   const isWin =
     (!opts.requireAllAssigned || stats.allAssigned) &&
     (!opts.requireExactSizes || stats.sizeAllOk) &&
     (!opts.requireContiguity || contiguityAllOk) &&
     meetsSeatTarget;
+
 
   return { seatsR, seatsB, allAssigned: stats.allAssigned, sizeAllOk: stats.sizeAllOk, contiguityAllOk, meetsSeatTarget, isWin, unmetReasons };
 }
