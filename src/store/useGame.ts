@@ -3,12 +3,25 @@ import { immer } from 'zustand/middleware/immer';
 import type { Cell } from '../game/grid';
 import { generateGrid } from '../game/grid';
 
+type Difficulty = 'easy' | 'medium' | 'hard';
+
+function redRatioFor(d: Difficulty): number {
+  // redRatio = P(cell is Red). Easy gives Blue advantage (more B).
+  if (d === 'easy') return 0.40;   // ~60% Blue
+  if (d === 'hard') return 0.60;   // ~60% Red
+  return 0.50;                     // balanced
+}
+
 type GameState = {
   rows: number;
   cols: number;
   cellSize: number;
   seed: number;
   grid: Cell[];
+
+  mode: 'freeplay' | 'level';
+  difficulty: Difficulty;
+  redRatio: number;
 
   totalDistricts: number;
   cellsPerDistrict: number;
@@ -27,14 +40,13 @@ type GameState = {
 
   // actions
   setCurrentDistrict: (d: number) => void;
+  setDifficulty: (d: Difficulty) => void;
   startPainting: (d?: number) => void;
   paintCellByIndex: (index: number) => void;
   stopPainting: () => void;
 
   regenerate: (seed?: number) => void;
 };
-
-// --- helpers for contiguity enforcement ---
 
 function neighbors4(index: number, rows: number, cols: number): number[] {
   const r = Math.floor(index / cols);
@@ -50,7 +62,7 @@ function neighbors4(index: number, rows: number, cols: number): number[] {
 function isAdditionSafe(grid: Cell[], rows: number, cols: number, d: number, addIndex: number): boolean {
   let hasAny = false;
   for (let i = 0; i < grid.length; i++) if (grid[i].districtId === d) { hasAny = true; break; }
-  if (!hasAny) return true; // first cell is always fine
+  if (!hasAny) return true;
   for (const nb of neighbors4(addIndex, rows, cols)) if (grid[nb] && grid[nb].districtId === d) return true;
   return false;
 }
@@ -58,7 +70,7 @@ function isAdditionSafe(grid: Cell[], rows: number, cols: number, d: number, add
 function isRemovalSafe(grid: Cell[], rows: number, cols: number, d: number, removeIndex: number): boolean {
   const remaining: number[] = [];
   for (let i = 0; i < grid.length; i++) if (i !== removeIndex && grid[i].districtId === d) remaining.push(i);
-  if (remaining.length === 0) return true; // removing last cell is fine
+  if (remaining.length === 0) return true;
 
   const allowed = new Set(remaining);
   const start = remaining[0];
@@ -81,13 +93,18 @@ export const useGame = create<GameState>()(
     cols: 20,
     cellSize: 24,
     seed: 12345,
-    grid: generateGrid({ rows: 20, cols: 20, seed: 12345, redRatio: 0.5 }),
+
+    mode: 'freeplay',
+    difficulty: 'medium',
+    redRatio: redRatioFor('medium'),
+
+    grid: generateGrid({ rows: 20, cols: 20, seed: 12345, redRatio: redRatioFor('medium') }),
 
     totalDistricts: 5,
-    cellsPerDistrict: 80,              // 400 / 5
+    cellsPerDistrict: 80, // 400 / 5
 
-    // Level target & checks (you can tweak these later per level)
-    targetSeats: { R: 2, B: 3 },       // exact 3–2 for Blue
+    // Freeplay default target/rules (can change later)
+    targetSeats: { R: 2, B: 3 },
     requireAllAssigned: true,
     requireExactSizes: true,
     requireContiguity: true,
@@ -104,6 +121,16 @@ export const useGame = create<GameState>()(
         st.currentDistrict = d;
       }),
 
+    setDifficulty: (d) =>
+      set((st) => {
+        st.difficulty = d;
+        st.redRatio = redRatioFor(d);
+        // regenerate on difficulty change with a fresh seed
+        const s = Math.floor(Math.random() * 1_000_000);
+        st.seed = s;
+        st.grid = generateGrid({ rows: st.rows, cols: st.cols, seed: s, redRatio: st.redRatio });
+      }),
+
     startPainting: (d) =>
       set((st) => {
         st.isPainting = true;
@@ -117,27 +144,22 @@ export const useGame = create<GameState>()(
         const cell = st.grid[index];
         if (!cell) return;
 
-        // ERASE (unassign) if it won't split source
         if (d === 0) {
           const source = cell.districtId;
-          if (!source) return; // already unassigned
+          if (!source) return;
           if (!isRemovalSafe(st.grid, rows, cols, source, index)) return;
           cell.districtId = undefined;
           return;
         }
 
-        // Paint to district d
-        if (cell.districtId === d) return; // no-op
+        if (cell.districtId === d) return;
 
-        // size cap
         let targetSize = 0;
         for (const c of st.grid) if (c.districtId === d) targetSize++;
         if (targetSize >= cellsPerDistrict) return;
 
-        // addition must touch district
         if (!isAdditionSafe(st.grid, rows, cols, d, index)) return;
 
-        // moving from another district must not split source
         const source = cell.districtId;
         if (source && source !== d) {
           if (!isRemovalSafe(st.grid, rows, cols, source, index)) return;
@@ -153,9 +175,13 @@ export const useGame = create<GameState>()(
       }),
 
     regenerate: (seed) => {
-      const s = seed ?? Math.floor(Math.random() * 1_000_000);
-      const { rows, cols } = get();
-      const grid = generateGrid({ rows, cols, seed: s, redRatio: 0.5 });
+      const s =
+        seed ??
+        (get().mode === 'freeplay'
+          ? Math.floor(Math.random() * 1_000_000)
+          : get().seed); // in level mode, keep current seed unless provided
+      const { rows, cols, redRatio } = get();
+      const grid = generateGrid({ rows, cols, seed: s, redRatio });
       set((st) => {
         st.seed = s;
         st.grid = grid;

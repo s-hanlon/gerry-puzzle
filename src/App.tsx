@@ -5,6 +5,33 @@ import { useMemo } from 'react';
 import HUD from './ui/HUD';
 import WinBanner from './ui/WinBanner';
 
+function FreeplayControls() {
+  const { difficulty, setDifficulty, regenerate } = useGame();
+
+  return (
+    <div style={{ display: 'flex', gap: 12, alignItems: 'center', marginBottom: 8, flexWrap: 'wrap' }}>
+      <label>
+        <span style={{ fontWeight: 600, marginRight: 6 }}>Difficulty:</span>
+        <select
+          value={difficulty}
+          onChange={(e) => setDifficulty(e.target.value as any)}
+          style={{ padding: '4px 6px', borderRadius: 6 }}
+        >
+          <option value="easy">Easy (more Blue)</option>
+          <option value="medium">Medium (balanced)</option>
+          <option value="hard">Hard (more Red)</option>
+        </select>
+      </label>
+      <button
+        onClick={() => regenerate()}
+        style={{ padding: '6px 10px', borderRadius: 6, border: '1px solid #ccc', background: '#fff', cursor: 'pointer' }}
+      >
+        New Map
+      </button>
+    </div>
+  );
+}
+
 function DistrictPicker() {
   const { grid, totalDistricts, cellsPerDistrict, currentDistrict, setCurrentDistrict } = useGame();
 
@@ -20,7 +47,6 @@ function DistrictPicker() {
 
   const buttons = [];
 
-  // Eraser button (0)
   buttons.push(
     <button
       key="eraser"
@@ -101,6 +127,10 @@ export default function App() {
   return (
     <div style={{ padding: 16, fontFamily: 'Inter, system-ui, Arial' }}>
       <h1 style={{ marginBottom: 12 }}>Gerry Puzzle (MVP)</h1>
+
+      {/* Freeplay difficulty + regenerate */}
+      <FreeplayControls />
+
       <p style={{ marginTop: 0, marginBottom: 12, opacity: 0.8 }}>
         Click and drag to paint cells. Use <strong>Eraser</strong> to unassign (won’t allow splits).
       </p>
@@ -113,8 +143,8 @@ export default function App() {
 
       <Board />
 
+      {/* Win banner + HUD */}
       <WinBanner />
-
       <HUD />
     </div>
   );
