@@ -3,13 +3,34 @@ import { immer } from 'zustand/middleware/immer';
 import type { Cell } from '../game/grid';
 import { generateGrid } from '../game/grid';
 import type { LevelDef } from '../game/levels';
+import { LEVELS } from '../game/levels';
 
 type Difficulty = 'easy' | 'medium' | 'hard';
 
 function redRatioFor(d: Difficulty): number {
+  // redRatio = P(cell is Red). Easy favors Blue (more blue cells overall).
   if (d === 'easy') return 0.40; // ~60% Blue
   if (d === 'hard') return 0.60; // ~60% Red
   return 0.50; // balanced
+}
+
+// ---- localStorage progress ----
+const PROG_KEY = 'gerry_progress_v1';
+function loadProgress(): number {
+  try {
+    const raw = localStorage.getItem(PROG_KEY);
+    if (!raw) return 0;
+    const v = JSON.parse(raw);
+    const n = Number(v?.unlockedThrough);
+    return Number.isFinite(n) ? n : 0;
+  } catch {
+    return 0;
+  }
+}
+function saveProgress(unlockedThrough: number) {
+  try {
+    localStorage.setItem(PROG_KEY, JSON.stringify({ unlockedThrough }));
+  } catch {}
 }
 
 type GameState = {
@@ -42,12 +63,17 @@ type GameState = {
 
   // Level state
   currentLevelIndex: number | null;
+  progressUnlockedThrough: number; // highest unlocked level index (0-based)
 
   // Actions
   setMode: (mode: 'freeplay' | 'level') => void;
   setCurrentDistrict: (d: number) => void;
   setDifficulty: (d: Difficulty) => void;
   loadLevel: (level: LevelDef, index: number) => void;
+  nextLevel: () => void;
+  retryLevel: () => void;
+  unlockUpTo: (index: number) => void;
+
   startPainting: (d?: number) => void;
   paintCellByIndex: (index: number) => void;
   stopPainting: () => void;
@@ -55,7 +81,6 @@ type GameState = {
 };
 
 // ---------- Contiguity helpers ----------
-
 function neighbors4(index: number, rows: number, cols: number): number[] {
   const r = Math.floor(index / cols);
   const c = index % cols;
@@ -66,33 +91,21 @@ function neighbors4(index: number, rows: number, cols: number): number[] {
   if (c < cols - 1) out.push(r * cols + (c + 1));
   return out;
 }
-
-// Allow adding a cell if the district is empty OR the cell is adjacent (4-neighbor) to it.
 function isAdditionSafe(grid: Cell[], rows: number, cols: number, d: number, addIndex: number): boolean {
   let hasAny = false;
-  for (let i = 0; i < grid.length; i++) {
-    if (grid[i].districtId === d) { hasAny = true; break; }
-  }
+  for (let i = 0; i < grid.length; i++) if (grid[i].districtId === d) { hasAny = true; break; }
   if (!hasAny) return true;
-  for (const nb of neighbors4(addIndex, rows, cols)) {
-    if (grid[nb] && grid[nb].districtId === d) return true;
-  }
+  for (const nb of neighbors4(addIndex, rows, cols)) if (grid[nb] && grid[nb].districtId === d) return true;
   return false;
 }
-
-// Safe to remove a cell from district d if the remainder stays in one component.
 function isRemovalSafe(grid: Cell[], rows: number, cols: number, d: number, removeIndex: number): boolean {
   const remaining: number[] = [];
-  for (let i = 0; i < grid.length; i++) {
-    if (i !== removeIndex && grid[i].districtId === d) remaining.push(i);
-  }
-  if (remaining.length === 0) return true; // removing the last cell is fine
-
+  for (let i = 0; i < grid.length; i++) if (i !== removeIndex && grid[i].districtId === d) remaining.push(i);
+  if (remaining.length === 0) return true;
   const allowed = new Set(remaining);
   const start = remaining[0];
   const visited = new Set<number>([start]);
   const q: number[] = [start];
-
   while (q.length) {
     const cur = q.shift()!;
     for (const nb of neighbors4(cur, rows, cols)) {
@@ -105,7 +118,6 @@ function isRemovalSafe(grid: Cell[], rows: number, cols: number, d: number, remo
 }
 
 // ---------- Store ----------
-
 export const useGame = create<GameState>()(
   immer((set, get) => ({
     rows: 20,
@@ -132,15 +144,15 @@ export const useGame = create<GameState>()(
     paintDistrict: null,
 
     currentLevelIndex: null,
+    progressUnlockedThrough: loadProgress(), // default: level 0 unlocked
 
-    // NEW: Simple mode switcher (tabs use this)
     setMode: (mode) =>
       set((st) => {
         if (mode === 'freeplay') {
           st.mode = 'freeplay';
           st.currentLevelIndex = null;
 
-          // Reset to your Freeplay defaults
+          // Reset to Freeplay defaults
           st.rows = 20;
           st.cols = 20;
           st.totalDistricts = 5;
@@ -151,18 +163,15 @@ export const useGame = create<GameState>()(
           st.requireExactSizes = true;
           st.requireContiguity = true;
 
-          // Use current difficulty to set composition
           st.redRatio = redRatioFor(st.difficulty);
           const s = Math.floor(Math.random() * 1_000_000);
           st.seed = s;
           st.grid = generateGrid({ rows: st.rows, cols: st.cols, seed: s, redRatio: st.redRatio });
 
-          // reset tool
           st.currentDistrict = 1;
           st.isPainting = false;
           st.paintDistrict = null;
         } else {
-          // Switch UI into "Levels" area (actual level loads when user picks one)
           st.mode = 'level';
         }
       }),
@@ -209,6 +218,72 @@ export const useGame = create<GameState>()(
         st.paintDistrict = null;
 
         st.grid = generateGrid({ rows: st.rows, cols: st.cols, seed: st.seed, redRatio: st.redRatio });
+      }),
+
+    nextLevel: () =>
+      set((st) => {
+        if (st.currentLevelIndex === null) return;
+        const next = st.currentLevelIndex + 1;
+        if (next >= LEVELS.length) return;
+        const lvl = LEVELS[next];
+        // auto-load next
+        st.mode = 'level';
+        st.currentLevelIndex = next;
+
+        st.rows = lvl.rows;
+        st.cols = lvl.cols;
+        st.totalDistricts = lvl.totalDistricts;
+        st.cellsPerDistrict = lvl.cellsPerDistrict;
+
+        st.targetSeats = lvl.targetSeats;
+        st.requireAllAssigned = lvl.requireAllAssigned;
+        st.requireExactSizes = lvl.requireExactSizes;
+        st.requireContiguity = lvl.requireContiguity;
+
+        st.redRatio = lvl.redRatio;
+        st.seed = lvl.seed;
+
+        st.currentDistrict = 1;
+        st.isPainting = false;
+        st.paintDistrict = null;
+
+        st.grid = generateGrid({ rows: st.rows, cols: st.cols, seed: st.seed, redRatio: st.redRatio });
+      }),
+
+    retryLevel: () =>
+      set((st) => {
+        if (st.currentLevelIndex === null) return;
+        const lvl = LEVELS[st.currentLevelIndex];
+        // reload same level (same seed)
+        st.mode = 'level';
+
+        st.rows = lvl.rows;
+        st.cols = lvl.cols;
+        st.totalDistricts = lvl.totalDistricts;
+        st.cellsPerDistrict = lvl.cellsPerDistrict;
+
+        st.targetSeats = lvl.targetSeats;
+        st.requireAllAssigned = lvl.requireAllAssigned;
+        st.requireExactSizes = lvl.requireExactSizes;
+        st.requireContiguity = lvl.requireContiguity;
+
+        st.redRatio = lvl.redRatio;
+        st.seed = lvl.seed;
+
+        st.currentDistrict = 1;
+        st.isPainting = false;
+        st.paintDistrict = null;
+
+        st.grid = generateGrid({ rows: st.rows, cols: st.cols, seed: st.seed, redRatio: st.redRatio });
+      }),
+
+    unlockUpTo: (index) =>
+      set((st) => {
+        const maxIndex = Math.min(index, LEVELS.length - 1);
+        if (maxIndex > st.progressUnlockedThrough) {
+          st.progressUnlockedThrough = maxIndex;
+          saveProgress(maxIndex);
+        }
       }),
 
     startPainting: (d) =>

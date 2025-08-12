@@ -4,9 +4,18 @@ import { computeStats } from '../game/scoring';
 import { computeContiguity } from '../game/contiguity';
 
 export default function HUD() {
-  const { grid, totalDistricts, cellsPerDistrict, rows, cols } = useGame();
+  const {
+    grid,
+    totalDistricts,
+    cellsPerDistrict,
+    rows,
+    cols,
+    mode,
+    requireContiguity,
+    targetSeats,
+  } = useGame();
 
-  // Existing board/district stats
+  // Existing stats
   const stats = useMemo(
     () => computeStats(grid, totalDistricts, cellsPerDistrict),
     [grid, totalDistricts, cellsPerDistrict]
@@ -16,7 +25,7 @@ export default function HUD() {
     [grid, totalDistricts, rows, cols]
   );
 
-  // NEW: global composition + unassigned pool composition
+  // Global composition + unassigned pool
   const { totalR, totalB, unassignedR, unassignedB } = useMemo(() => {
     let totalR = 0, unassignedR = 0;
     for (const cell of grid) {
@@ -36,6 +45,22 @@ export default function HUD() {
     return m;
   }, [contig]);
 
+  const seatTargetEnabled = (targetSeats.R + targetSeats.B) > 0;
+
+  const chip = (label: string, value: string) => (
+    <span
+      style={{
+        fontSize: 12,
+        padding: '4px 8px',
+        borderRadius: 999,
+        border: '1px solid #e0e0e0',
+        background: '#fff',
+      }}
+    >
+      <strong>{label}:</strong> {value}
+    </span>
+  );
+
   return (
     <div
       style={{
@@ -47,7 +72,14 @@ export default function HUD() {
         fontFamily: 'Inter, system-ui, Arial',
       }}
     >
-      {/* NEW: Global composition row */}
+      {/* NEW: Chips row */}
+      <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 8 }}>
+        {chip('Mode', mode === 'level' ? 'Level' : 'Freeplay')}
+        {chip('Contiguity', requireContiguity ? 'ON' : 'OFF')}
+        {chip('Seat target', seatTargetEnabled ? `R ${targetSeats.R} · B ${targetSeats.B}` : 'ignored')}
+      </div>
+
+      {/* Global composition */}
       <div style={{ display: 'flex', flexWrap: 'wrap', gap: 16, marginBottom: 8 }}>
         <strong>Board composition:</strong>
         <span>R {totalR} · B {totalB}</span>
@@ -55,7 +87,7 @@ export default function HUD() {
         <span>R {unassignedR} · B {unassignedB}</span>
       </div>
 
-      {/* Existing topline */}
+      {/* Topline */}
       <div style={{ display: 'flex', flexWrap: 'wrap', gap: 16, marginBottom: 8 }}>
         <strong>Unassigned:</strong>
         <span>

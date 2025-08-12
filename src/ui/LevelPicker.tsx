@@ -2,7 +2,7 @@ import { LEVELS } from '../game/levels';
 import { useGame } from '../store/useGame';
 
 export default function LevelPicker() {
-  const { loadLevel, mode, currentLevelIndex, setMode } = useGame();
+  const { loadLevel, mode, currentLevelIndex, setMode, progressUnlockedThrough } = useGame();
 
   return (
     <div
@@ -15,7 +15,12 @@ export default function LevelPicker() {
       }}
     >
       <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center', marginBottom: 8 }}>
-        <div style={{ fontWeight: 700 }}>Levels — World 1</div>
+        <div style={{ fontWeight: 700 }}>
+          Levels — World 1
+          <span style={{ fontWeight: 500, marginLeft: 8, fontSize: 12, opacity: 0.8 }}>
+            Unlocked: {progressUnlockedThrough + 1}/{LEVELS.length}
+          </span>
+        </div>
         <button
           onClick={() => setMode('freeplay')}
           style={{ padding: '6px 10px', borderRadius: 6, border: '1px solid #ccc', background: '#fff', cursor: 'pointer' }}
@@ -28,6 +33,7 @@ export default function LevelPicker() {
       <div style={{ display: 'grid', gap: 8 }}>
         {LEVELS.map((lvl, i) => {
           const isActive = mode === 'level' && currentLevelIndex === i;
+          const locked = i > progressUnlockedThrough;
           return (
             <div
               key={lvl.name}
@@ -39,6 +45,7 @@ export default function LevelPicker() {
                 border: '1px solid #eee',
                 borderRadius: 6,
                 background: isActive ? '#eef7ff' : '#fff',
+                opacity: locked ? 0.6 : 1,
               }}
             >
               <div>
@@ -46,17 +53,18 @@ export default function LevelPicker() {
                 <div style={{ fontSize: 12, opacity: 0.8 }}>{lvl.blurb}</div>
               </div>
               <button
-                onClick={() => loadLevel(lvl, i)}
+                onClick={() => !locked && loadLevel(lvl, i)}
+                disabled={locked}
                 style={{
                   padding: '6px 10px',
                   borderRadius: 6,
                   border: '1px solid #ccc',
                   background: '#fff',
-                  cursor: 'pointer',
+                  cursor: locked ? 'not-allowed' : 'pointer',
                 }}
-                title="Load this level"
+                title={locked ? 'Locked — complete earlier levels to unlock' : 'Play this level'}
               >
-                {isActive ? 'Loaded' : 'Play'}
+                {locked ? 'Locked' : isActive ? 'Loaded' : 'Play'}
               </button>
             </div>
           );

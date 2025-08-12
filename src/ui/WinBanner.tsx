@@ -1,6 +1,7 @@
-import { useMemo } from 'react';
+import { useEffect, useMemo, useRef } from 'react';
 import { useGame } from '../store/useGame';
 import { evaluateWin } from '../game/win';
+import { LEVELS } from '../game/levels';
 
 export default function WinBanner() {
   const {
@@ -14,6 +15,11 @@ export default function WinBanner() {
     requireExactSizes,
     requireContiguity,
     regenerate,
+    mode,
+    currentLevelIndex,
+    nextLevel,
+    retryLevel,
+    unlockUpTo,
   } = useGame();
 
   const result = useMemo(
@@ -44,7 +50,24 @@ export default function WinBanner() {
     ]
   );
 
+  // When a level is beaten, unlock the next level (idempotent).
+  const unlockedForThisLevel = useRef(false);
+  useEffect(() => {
+    if (mode !== 'level') return;
+    if (!result.isWin) {
+      unlockedForThisLevel.current = false;
+      return;
+    }
+    if (unlockedForThisLevel.current) return;
+    if (currentLevelIndex === null) return;
+
+    const nextIndex = currentLevelIndex + 1;
+    if (nextIndex < LEVELS.length) unlockUpTo(nextIndex);
+    unlockedForThisLevel.current = true;
+  }, [mode, result.isWin, currentLevelIndex, unlockUpTo]);
+
   if (result.isWin) {
+    const hasNext = mode === 'level' && currentLevelIndex !== null && currentLevelIndex + 1 < LEVELS.length;
     return (
       <div
         style={{
@@ -58,28 +81,43 @@ export default function WinBanner() {
           alignItems: 'center',
           justifyContent: 'space-between',
           gap: 12,
+          flexWrap: 'wrap',
         }}
       >
         <div style={{ fontWeight: 700 }}>✅ Level Complete!</div>
         <div>
           Seats: R {result.seatsR} · B {result.seatsB} — Target R {targetSeats.R} · B {targetSeats.B}
         </div>
-        <button
-          onClick={() => regenerate()}
-          style={{
-            padding: '6px 10px',
-            borderRadius: 6,
-            border: '1px solid #80d199',
-            background: '#f6fffa',
-            cursor: 'pointer',
-          }}
-        >
-          New Map
-        </button>
+        {mode === 'level' ? (
+          <div style={{ display: 'flex', gap: 8 }}>
+            <button
+              onClick={retryLevel}
+              style={{ padding: '6px 10px', borderRadius: 6, border: '1px solid #80d199', background: '#f6fffa', cursor: 'pointer' }}
+            >
+              Retry
+            </button>
+            <button
+              onClick={nextLevel}
+              disabled={!hasNext}
+              title={hasNext ? 'Go to next level' : 'No more levels'}
+              style={{ padding: '6px 10px', borderRadius: 6, border: '1px solid #80d199', background: '#f6fffa', cursor: hasNext ? 'pointer' : 'not-allowed' }}
+            >
+              Next Level
+            </button>
+          </div>
+        ) : (
+          <button
+            onClick={() => regenerate()}
+            style={{ padding: '6px 10px', borderRadius: 6, border: '1px solid #80d199', background: '#f6fffa', cursor: 'pointer' }}
+          >
+            New Map
+          </button>
+        )}
       </div>
     );
   }
 
+  // Not a win yet -> show checklist status
   return (
     <div
       style={{
