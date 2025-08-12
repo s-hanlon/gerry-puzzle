@@ -3,6 +3,7 @@ export type Cell = {
   r: number;
   c: number;
   color: 'R' | 'B';
+  districtId?: number; // <-- new: which district this cell is painted into
 };
 
 export type LevelConfig = {
