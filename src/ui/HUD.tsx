@@ -13,9 +13,9 @@ export default function HUD() {
     mode,
     requireContiguity,
     targetSeats,
+    lockedSeedsPerDistrict,
   } = useGame();
 
-  // Existing stats
   const stats = useMemo(
     () => computeStats(grid, totalDistricts, cellsPerDistrict),
     [grid, totalDistricts, cellsPerDistrict]
@@ -25,7 +25,6 @@ export default function HUD() {
     [grid, totalDistricts, rows, cols]
   );
 
-  // Global composition + unassigned pool
   const { totalR, totalB, unassignedR, unassignedB } = useMemo(() => {
     let totalR = 0, unassignedR = 0;
     for (const cell of grid) {
@@ -72,14 +71,13 @@ export default function HUD() {
         fontFamily: 'Inter, system-ui, Arial',
       }}
     >
-      {/* NEW: Chips row */}
       <div style={{ display: 'flex', gap: 8, flexWrap: 'wrap', marginBottom: 8 }}>
         {chip('Mode', mode === 'level' ? 'Level' : 'Freeplay')}
         {chip('Contiguity', requireContiguity ? 'ON' : 'OFF')}
         {chip('Seat target', seatTargetEnabled ? `R ${targetSeats.R} · B ${targetSeats.B}` : 'ignored')}
+        {chip('Seeds', lockedSeedsPerDistrict > 0 ? `${lockedSeedsPerDistrict}/district` : 'none')}
       </div>
 
-      {/* Global composition */}
       <div style={{ display: 'flex', flexWrap: 'wrap', gap: 16, marginBottom: 8 }}>
         <strong>Board composition:</strong>
         <span>R {totalR} · B {totalB}</span>
@@ -87,7 +85,6 @@ export default function HUD() {
         <span>R {unassignedR} · B {unassignedB}</span>
       </div>
 
-      {/* Topline */}
       <div style={{ display: 'flex', flexWrap: 'wrap', gap: 16, marginBottom: 8 }}>
         <strong>Unassigned:</strong>
         <span>

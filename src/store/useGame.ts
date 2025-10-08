@@ -8,7 +8,6 @@ import { LEVELS } from '../game/levels';
 type Difficulty = 'easy' | 'medium' | 'hard';
 
 function redRatioFor(d: Difficulty): number {
-  // redRatio = P(cell is Red). Easy favors Blue (more blue cells overall).
   if (d === 'easy') return 0.40; // ~60% Blue
   if (d === 'hard') return 0.60; // ~60% Red
   return 0.50; // balanced
@@ -55,6 +54,7 @@ type GameState = {
   requireAllAssigned: boolean;
   requireExactSizes: boolean;
   requireContiguity: boolean;
+  lockedSeedsPerDistrict: number; // NEW
 
   // Tool state
   currentDistrict: number; // 0 = Eraser, 1..N = districts
@@ -63,7 +63,7 @@ type GameState = {
 
   // Level state
   currentLevelIndex: number | null;
-  progressUnlockedThrough: number; // highest unlocked level index (0-based)
+  progressUnlockedThrough: number;
 
   // Actions
   setMode: (mode: 'freeplay' | 'level') => void;
@@ -129,22 +129,30 @@ export const useGame = create<GameState>()(
     difficulty: 'medium',
     redRatio: redRatioFor('medium'),
 
-    grid: generateGrid({ rows: 20, cols: 20, seed: 12345, redRatio: redRatioFor('medium') }),
-
     totalDistricts: 5,
     cellsPerDistrict: 80, // 400 / 5
 
     targetSeats: { R: 2, B: 3 },
     requireAllAssigned: true,
     requireExactSizes: true,
-    requireContiguity: true, // toggled per level
+    requireContiguity: true,
+    lockedSeedsPerDistrict: 0,
+
+    grid: generateGrid({
+      rows: 20,
+      cols: 20,
+      seed: 12345,
+      redRatio: redRatioFor('medium'),
+      totalDistricts: 5,
+      lockedSeedsPerDistrict: 0,
+    }),
 
     currentDistrict: 1,
     isPainting: false,
     paintDistrict: null,
 
     currentLevelIndex: null,
-    progressUnlockedThrough: loadProgress(), // default: level 0 unlocked
+    progressUnlockedThrough: loadProgress(),
 
     setMode: (mode) =>
       set((st) => {
@@ -152,7 +160,6 @@ export const useGame = create<GameState>()(
           st.mode = 'freeplay';
           st.currentLevelIndex = null;
 
-          // Reset to Freeplay defaults
           st.rows = 20;
           st.cols = 20;
           st.totalDistricts = 5;
@@ -162,11 +169,19 @@ export const useGame = create<GameState>()(
           st.requireAllAssigned = true;
           st.requireExactSizes = true;
           st.requireContiguity = true;
+          st.lockedSeedsPerDistrict = 0;
 
           st.redRatio = redRatioFor(st.difficulty);
           const s = Math.floor(Math.random() * 1_000_000);
           st.seed = s;
-          st.grid = generateGrid({ rows: st.rows, cols: st.cols, seed: s, redRatio: st.redRatio });
+          st.grid = generateGrid({
+            rows: st.rows,
+            cols: st.cols,
+            seed: s,
+            redRatio: st.redRatio,
+            totalDistricts: st.totalDistricts,
+            lockedSeedsPerDistrict: st.lockedSeedsPerDistrict,
+          });
 
           st.currentDistrict = 1;
           st.isPainting = false;
@@ -189,9 +204,17 @@ export const useGame = create<GameState>()(
         st.currentLevelIndex = null;
         st.difficulty = d;
         st.redRatio = redRatioFor(d);
+        st.lockedSeedsPerDistrict = 0;
         const s = Math.floor(Math.random() * 1_000_000);
         st.seed = s;
-        st.grid = generateGrid({ rows: st.rows, cols: st.cols, seed: s, redRatio: st.redRatio });
+        st.grid = generateGrid({
+          rows: st.rows,
+          cols: st.cols,
+          seed: s,
+          redRatio: st.redRatio,
+          totalDistricts: st.totalDistricts,
+          lockedSeedsPerDistrict: st.lockedSeedsPerDistrict,
+        });
       }),
 
     loadLevel: (level, index) =>
@@ -208,6 +231,7 @@ export const useGame = create<GameState>()(
         st.requireAllAssigned = level.requireAllAssigned;
         st.requireExactSizes = level.requireExactSizes;
         st.requireContiguity = level.requireContiguity;
+        st.lockedSeedsPerDistrict = level.lockedSeedsPerDistrict ?? 0;
 
         st.redRatio = level.redRatio;
         st.seed = level.seed;
@@ -217,7 +241,14 @@ export const useGame = create<GameState>()(
         st.isPainting = false;
         st.paintDistrict = null;
 
-        st.grid = generateGrid({ rows: st.rows, cols: st.cols, seed: st.seed, redRatio: st.redRatio });
+        st.grid = generateGrid({
+          rows: st.rows,
+          cols: st.cols,
+          seed: st.seed,
+          redRatio: st.redRatio,
+          totalDistricts: st.totalDistricts,
+          lockedSeedsPerDistrict: st.lockedSeedsPerDistrict,
+        });
       }),
 
     nextLevel: () =>
@@ -226,7 +257,7 @@ export const useGame = create<GameState>()(
         const next = st.currentLevelIndex + 1;
         if (next >= LEVELS.length) return;
         const lvl = LEVELS[next];
-        // auto-load next
+
         st.mode = 'level';
         st.currentLevelIndex = next;
 
@@ -239,6 +270,7 @@ export const useGame = create<GameState>()(
         st.requireAllAssigned = lvl.requireAllAssigned;
         st.requireExactSizes = lvl.requireExactSizes;
         st.requireContiguity = lvl.requireContiguity;
+        st.lockedSeedsPerDistrict = lvl.lockedSeedsPerDistrict ?? 0;
 
         st.redRatio = lvl.redRatio;
         st.seed = lvl.seed;
@@ -247,14 +279,21 @@ export const useGame = create<GameState>()(
         st.isPainting = false;
         st.paintDistrict = null;
 
-        st.grid = generateGrid({ rows: st.rows, cols: st.cols, seed: st.seed, redRatio: st.redRatio });
+        st.grid = generateGrid({
+          rows: st.rows,
+          cols: st.cols,
+          seed: st.seed,
+          redRatio: st.redRatio,
+          totalDistricts: st.totalDistricts,
+          lockedSeedsPerDistrict: st.lockedSeedsPerDistrict,
+        });
       }),
 
     retryLevel: () =>
       set((st) => {
         if (st.currentLevelIndex === null) return;
         const lvl = LEVELS[st.currentLevelIndex];
-        // reload same level (same seed)
+
         st.mode = 'level';
 
         st.rows = lvl.rows;
@@ -266,6 +305,7 @@ export const useGame = create<GameState>()(
         st.requireAllAssigned = lvl.requireAllAssigned;
         st.requireExactSizes = lvl.requireExactSizes;
         st.requireContiguity = lvl.requireContiguity;
+        st.lockedSeedsPerDistrict = lvl.lockedSeedsPerDistrict ?? 0;
 
         st.redRatio = lvl.redRatio;
         st.seed = lvl.seed;
@@ -274,12 +314,19 @@ export const useGame = create<GameState>()(
         st.isPainting = false;
         st.paintDistrict = null;
 
-        st.grid = generateGrid({ rows: st.rows, cols: st.cols, seed: st.seed, redRatio: st.redRatio });
+        st.grid = generateGrid({
+          rows: st.rows,
+          cols: st.cols,
+          seed: st.seed,
+          redRatio: st.redRatio,
+          totalDistricts: st.totalDistricts,
+          lockedSeedsPerDistrict: st.lockedSeedsPerDistrict,
+        });
       }),
 
     unlockUpTo: (index) =>
       set((st) => {
-        const maxIndex = Math.min(index, LEVELS.length - 1);
+        const maxIndex = index;
         if (maxIndex > st.progressUnlockedThrough) {
           st.progressUnlockedThrough = maxIndex;
           saveProgress(maxIndex);
@@ -299,11 +346,13 @@ export const useGame = create<GameState>()(
         const cell = st.grid[index];
         if (!cell) return;
 
+        // Disallow changing locked cells
+        if (cell.locked) return;
+
         // ----- ERASE (unassign) -----
         if (d === 0) {
           const source = cell.districtId;
           if (!source) return; // already unassigned
-          // Only block splits if contiguity is required for this level
           if (requireContiguity && !isRemovalSafe(st.grid, rows, cols, source, index)) return;
           cell.districtId = undefined;
           return;
@@ -312,17 +361,18 @@ export const useGame = create<GameState>()(
         // ----- PAINT to district d -----
         if (cell.districtId === d) return; // no-op
 
-        // Size cap is always enforced
+        // Size cap
         let targetSize = 0;
         for (const c of st.grid) if (c.districtId === d) targetSize++;
         if (targetSize >= cellsPerDistrict) return;
 
-        // Only enforce adjacency if contiguity is required
+        // Adjacency only if contiguity required
         if (requireContiguity && !isAdditionSafe(st.grid, rows, cols, d, index)) return;
 
         // Moving from another district: only block if contiguity required
         const source = cell.districtId;
         if (source && source !== d) {
+          // also protect if the source cell is locked (already covered above)
           if (requireContiguity && !isRemovalSafe(st.grid, rows, cols, source, index)) return;
         }
 
@@ -340,9 +390,16 @@ export const useGame = create<GameState>()(
         seed ??
         (get().mode === 'freeplay'
           ? Math.floor(Math.random() * 1_000_000)
-          : get().seed); // in level mode, keep the seed unless explicitly provided
-      const { rows, cols, redRatio } = get();
-      const grid = generateGrid({ rows, cols, seed: s, redRatio });
+          : get().seed);
+      const { rows, cols, redRatio, totalDistricts, lockedSeedsPerDistrict } = get();
+      const grid = generateGrid({
+        rows,
+        cols,
+        seed: s,
+        redRatio,
+        totalDistricts,
+        lockedSeedsPerDistrict,
+      });
       set((st) => {
         st.seed = s;
         st.grid = grid;
