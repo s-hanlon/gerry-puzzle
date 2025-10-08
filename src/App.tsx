@@ -5,6 +5,7 @@ import { useMemo } from 'react';
 import HUD from './ui/HUD';
 import WinBanner from './ui/WinBanner';
 import LevelPicker from './ui/LevelPicker';
+import { DISTRICT_COLORS, colorNumToHex, colorNumToRgba } from './constants/colors';
 
 function ModeTabs() {
   const { mode, setMode } = useGame();
@@ -69,14 +70,15 @@ function DistrictPicker() {
 
   const buttons = [];
 
+  // Eraser
   buttons.push(
     <button
       key="eraser"
       onClick={() => setCurrentDistrict(0)}
       style={{
         padding: '6px 10px',
-        borderRadius: 6,
-        border: currentDistrict === 0 ? '2px solid black' : '1px solid #ccc',
+        borderRadius: 8,
+        border: currentDistrict === 0 ? '2px solid #111' : '1px solid #ccc',
         background: currentDistrict === 0 ? '#fff' : '#f7f7f7',
         fontWeight: currentDistrict === 0 ? 700 : 500,
         cursor: 'pointer',
@@ -87,17 +89,23 @@ function DistrictPicker() {
     </button>
   );
 
+  // D1..DN (color coded)
   for (let d = 1; d <= totalDistricts; d++) {
     const isActive = d === currentDistrict;
+    const colorNum = DISTRICT_COLORS[(d - 1) % DISTRICT_COLORS.length];
+    const border = `1px solid ${colorNumToHex(colorNum)}`;
+    const borderActive = `2px solid ${colorNumToHex(colorNum)}`;
+    const bg = colorNumToRgba(colorNum, isActive ? 0.22 : 0.10);
+
     buttons.push(
       <button
         key={d}
         onClick={() => setCurrentDistrict(d)}
         style={{
           padding: '6px 10px',
-          borderRadius: 6,
-          border: isActive ? '2px solid black' : '1px solid #ccc',
-          background: isActive ? '#fff' : '#f7f7f7',
+          borderRadius: 8,
+          border: isActive ? borderActive : border,
+          background: bg,
           fontWeight: isActive ? 700 : 500,
           cursor: 'pointer',
         }}
@@ -152,13 +160,8 @@ export default function App() {
     <div style={{ padding: 16, fontFamily: 'Inter, system-ui, Arial' }}>
       <h1 style={{ marginBottom: 12 }}>Gerry Puzzle (MVP)</h1>
 
-      {/* NEW: Mode tabs */}
       <ModeTabs />
-
-      {/* Freeplay controls (disabled in Level mode) */}
       <FreeplayControls />
-
-      {/* Level picker only when in Levels */}
       {mode === 'level' && <LevelPicker />}
 
       <p style={{ marginTop: 0, marginBottom: 12, opacity: 0.8 }}>

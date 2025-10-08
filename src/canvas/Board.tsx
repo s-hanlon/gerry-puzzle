@@ -8,18 +8,16 @@ import {
   type FederatedPointerEvent,
 } from 'pixi.js';
 import { useGame } from '../store/useGame';
+import { DISTRICT_COLORS } from '../constants/colors';
 
 extend({ Container, Graphics });
 
-const DISTRICT_COLORS: number[] = [
-  0x00c853, // 1
-  0xffab00, // 2
-  0x7c4dff, // 3
-  0xff5252, // 4
-  0x40c4ff, // 5
-  0xb388ff, // 6 (future)
-  0x8bc34a, // 7 (future)
-];
+// Detect right-click across browsers
+const isRightClick = (e: FederatedPointerEvent) =>
+  e.button === 2 ||
+  // some browsers / devices report through .buttons or originalEvent
+  (e as any).buttons === 2 ||
+  (e.originalEvent as any)?.button === 2;
 
 export default function Board() {
   const {
@@ -55,7 +53,7 @@ export default function Board() {
       if (!districtId) return;
       const color = DISTRICT_COLORS[(districtId - 1) % DISTRICT_COLORS.length] ?? 0x000000;
       g.rect(x, y, cellSize - 1, cellSize - 1)
-        .fill({ color, alpha: 0.75 }) // <-- tweak here if you want
+        .fill({ color, alpha: 0.75 }) // adjust here if you want
         .stroke({ color, alpha: 0.6, width: 1 });
     },
     [cellSize]
@@ -144,7 +142,9 @@ export default function Board() {
 
   const onPointerDown = useCallback(
     (e: FederatedPointerEvent) => {
-      startPainting();
+      const right = isRightClick(e);
+      // Right-click starts painting with Eraser (district 0); left uses current tool
+      startPainting(right ? 0 : undefined);
       const idx = getIndexFromPointer(e);
       if (idx >= 0) paintCellByIndex(idx);
     },
@@ -168,6 +168,7 @@ export default function Board() {
     <div style={{ display: 'grid', gap: 8 }}>
       <div
         ref={parentRef}
+        onContextMenu={(e) => e.preventDefault()}  // enable right-drag erase (no context menu)
         style={{ width, height, border: '1px solid #ddd', borderRadius: 6 }}
       >
         <Application resizeTo={parentRef}>

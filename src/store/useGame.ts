@@ -339,6 +339,7 @@ export const useGame = create<GameState>()(
         st.paintDistrict = d ?? st.currentDistrict;
       }),
 
+    // RIGHT-CLICK ERASE; no left-click toggle
     paintCellByIndex: (index) =>
       set((st) => {
         const d = st.paintDistrict ?? st.currentDistrict; // 0 = Eraser
@@ -346,10 +347,10 @@ export const useGame = create<GameState>()(
         const cell = st.grid[index];
         if (!cell) return;
 
-        // Disallow changing locked cells
+        // Never change locked cells
         if (cell.locked) return;
 
-        // ----- ERASE (unassign) -----
+        // ---- ERASE tool (district 0) ----
         if (d === 0) {
           const source = cell.districtId;
           if (!source) return; // already unassigned
@@ -358,21 +359,20 @@ export const useGame = create<GameState>()(
           return;
         }
 
-        // ----- PAINT to district d -----
+        // ---- PAINT to district d ----
         if (cell.districtId === d) return; // no-op
 
-        // Size cap
+        // size cap
         let targetSize = 0;
         for (const c of st.grid) if (c.districtId === d) targetSize++;
         if (targetSize >= cellsPerDistrict) return;
 
-        // Adjacency only if contiguity required
+        // adjacency only if contiguity required
         if (requireContiguity && !isAdditionSafe(st.grid, rows, cols, d, index)) return;
 
-        // Moving from another district: only block if contiguity required
+        // moving from another district: only block if contiguity required
         const source = cell.districtId;
         if (source && source !== d) {
-          // also protect if the source cell is locked (already covered above)
           if (requireContiguity && !isRemovalSafe(st.grid, rows, cols, source, index)) return;
         }
 
